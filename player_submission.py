@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from game import Board, game_as_text
 from random import randint
+import game
 
 
 # This file is your main submission that will be graded against. Do not
@@ -55,9 +56,44 @@ class CustomEvalFn:
             float: The current state's score, based on your own heuristic.
 
         """
+        my_moves = len(game.get_legal_moves())
+        opponent_moves = len(game.get_opponent_moves())
+        mobility_score = my_moves - opponent_moves
+        center_control_score = self.evaluate_center(game)
+        threat_score = self.evaluate_threats(game)
 
+        total_score = mobility_score + center_control_score + threat_score
+
+        return total_score if maximizing_player_turn else -total_score
         # TODO: finish this function!
         raise NotImplementedError
+
+    def evaluate_center(self, game):
+        center_squares = [(3, 3), (3, 4), (4, 3), (4, 4)]
+        score = 0
+        for square in center_squares:
+            if game.is_spot_open(square[0], square[1]):
+                score += 2
+            if game.is_spot_queen(square[0], square[1]):
+                score += 5
+        return score
+
+    def evaluate_threats(self, game):
+        """Evaluate if the opponent's queen is threatened."""
+        score = 0
+        state = game.get_state()
+        q = game.get_inactive_players_queen()
+        opponent_queen_pos = None
+        for row in range(0, 7):
+            for col in range(0, 7):
+                if state[row][col] == q:
+                    opponent_queen_pos = row, col
+        if opponent_queen_pos is not None:
+            row, col = opponent_queen_pos
+            if not game.move_is_in_board(row + 1, col) or not game.move_is_in_board(row - 1, col) or \
+               not game.move_is_in_board(row, col + 1) or not game.move_is_in_board(row, col - 1):
+                score -= 10
+        return score
 
 
 class CustomPlayer:
@@ -67,7 +103,7 @@ class CustomPlayer:
     You must finish and test this player to make sure it properly
     uses minimax and alpha-beta to return a good move."""
 
-    def __init__(self, search_depth, eval_fn=OpenMoveEvalFn()):
+    def __init__(self, search_depth, eval_fn=CustomEvalFn()):
         """Initializes your player.
 
         if you find yourself with a superior eval function, update the default
@@ -98,7 +134,8 @@ class CustomPlayer:
                 tuple: best_move
             """
 
-        best_move, utility = self.minimax(game, time_left, depth=self.search_depth)
+        best_move, utility = self.alphabeta(
+            game, time_left, depth=self.search_depth)
         return best_move
 
     def utility(self, game, maximizing_player):
@@ -118,25 +155,41 @@ class CustomPlayer:
             (tuple, int): best_move, val
         """
         # TODO: finish this function!
-        best_move = (0, 0)
-        best_val = float('-inf')
+        # best_move = (0, 0)
+        # best_val = float('-inf')
 
-        if not game.get_legal_moves():
-            return best_move, best_val
-
-        for move in game.get_legal_moves():
-            next_game, _, _ = game.forecast_move(move)
-            value = self.min_value(next_game, depth - 1, best_move) if maximizing_player else self.max_value(next_game, depth - 1, best_move)
-            if maximizing_player:
+        if not game.get_legal_moves() or depth == 0 or time_left() <= 0:
+            return None, self.utility(game, maximizing_player)
+        best_move = None
+        if maximizing_player:
+            best_val = float('-inf')
+            for move in game.get_legal_moves():
+                next_game, _, _ = game.forecast_move(move)
+                # Get value from min_value
+                value = self.min_value(
+                    next_game, depth - 1, False)
                 if value > best_val:
-                    best_val, best_move = value, move
-            else:
+                    best_val = value
+                    best_move = move
+                    if time_left() <= 0:
+                        return best_move, best_val
+            return best_move, best_val  # Return value and best move
+        else:
+            best_val = float('inf')
+            for move in game.get_legal_moves():
+                next_game, _, _ = game.forecast_move(move)
+                # Get value from max_value
+                value = self.max_value(
+                    next_game,  depth - 1, True)
                 if value < best_val:
-                    best_val, best_move = value, move
-
-        return best_move, best_val
+                    best_val = value
+                    best_move = move
+                    if time_left() <= 0:
+                        return best_move, best_val
+            return best_move, best_val  # Return value and best move
 
     # Maximizing player strategy
+
     def max_value(self, game, depth, last_best_move):
         # if self.time_left() < TimeLimit
         #   Raise last_best_move
@@ -149,7 +202,8 @@ class CustomPlayer:
         best_score = float('-inf')
         for move in game.get_legal_moves():
             next_game, _, _ = game.forecast_move(move)
-            best_score = max(best_score, self.min_value(next_game, depth - 1, last_best_move))
+            best_score = max(best_score, self.min_value(
+                next_game, depth - 1, last_best_move))
         return best_score
 
     # Minimizing player strategy
@@ -165,9 +219,9 @@ class CustomPlayer:
         best_score = float('inf')
         for move in game.get_legal_moves():
             next_game, _, _ = game.forecast_move(move)
-            best_score = min(best_score, self.max_value(next_game, depth - 1, last_best_move))
+            best_score = min(best_score, self.max_value(
+                next_game, depth - 1, last_best_move))
         return best_score
-
 
     def alphabeta(self, game, time_left, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implementation of the alphabeta algorithm
@@ -183,6 +237,52 @@ class CustomPlayer:
         Returns:
             (tuple, int): best_move, val
         """
+        if depth == 0 or not game.get_legal_moves():
+            return None, self.utility(game, maximizing_player)
+
+        best_move = None
+
+        if maximizing_player:
+            best_val = float('-inf')
+            for move in game.get_legal_moves():
+                next_game, _, _ = game.forecast_move(move)
+
+                # Check time left before making a recursive call
+                if time_left() <= 0:
+                    break
+
+                value = self.alphabeta(
+                    next_game, time_left, depth - 1, alpha, beta, False)[1]
+
+                if value > best_val:
+                    best_val = value
+                    best_move = move
+
+                alpha = max(alpha, best_val)
+
+                if beta <= alpha:
+                    break
+        else:
+            best_val = float('inf')
+            for move in game.get_legal_moves():
+                next_game, _, _ = game.forecast_move(move)
+
+                # Check time left before making a recursive call
+                if time_left() <= 0:
+                    break
+
+                value = self.alphabeta(
+                    next_game, time_left, depth - 1, alpha, beta, True)[1]
+
+                if value < best_val:
+                    best_val = value
+                    best_move = move
+
+                beta = min(beta, best_val)
+
+                if beta <= alpha:
+                    break
+
+        return best_move, best_val
         # TODO: finish this function!
-        raise NotImplementedError
-        return best_move, val
+        # raise NotImplementedError
