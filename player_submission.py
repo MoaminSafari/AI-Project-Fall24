@@ -67,7 +67,7 @@ class CustomPlayer:
     You must finish and test this player to make sure it properly
     uses minimax and alpha-beta to return a good move."""
 
-    def __init__(self, search_depth, eval_fn=OpenMoveEvalFn()):
+    def __init__(self, eval_fn=OpenMoveEvalFn()):
         """Initializes your player.
 
         if you find yourself with a superior eval function, update the default
@@ -78,7 +78,7 @@ class CustomPlayer:
             eval_fn (function): Utility function used by your agent
         """
         self.eval_fn = eval_fn
-        self.search_depth = search_depth
+        self.search_depth = 4 # You can change it!
 
     def move(self, game, legal_moves, time_left):
         """Called to determine one move by your agent
