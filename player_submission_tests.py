@@ -58,11 +58,11 @@ def main():
     print("")
     try:
         r = RandomPlayer()  # or HumanPlayer()
-        h = CustomPlayer(3)  # or HumanPlayer()
+        h = CustomPlayer()  # or HumanPlayer()
         game = Board(r, h, 7, 7)
         output_b = game.copy()
         winner, move_history, termination = game.play_isolation(
-            time_limit=1000, print_moves=True)
+            time_limit=1200, print_moves=False)
         print("\n{} has won. Reason: {}".format(winner, termination))
         # Uncomment to see game
         # print game_as_text(winner, move_history, termination, output_b)
